@@ -1,0 +1,117 @@
+--Ejercico 1: Bloque con RECORD y manera de excepciones
+DECLARE
+	TYPE r_recinto_info IS RECORD (
+		nombre          recinto.nombre%TYPE,
+		direccion       recinto.direccion%TYPE,
+		ciudad          recinto.ciudad%TYPE,
+		capacidad_total recinto.capacidad_total%TYPE
+	);
+
+	v_recinto     r_recinto_info;
+	p_recinto_id  recinto.recinto_id%TYPE := 1;
+BEGIN
+	SELECT nombre,
+		   direccion,
+		   ciudad,
+		   capacidad_total
+	INTO   v_recinto
+	FROM   recinto
+	WHERE  recinto_id = p_recinto_id;
+
+	DBMS_OUTPUT.PUT_LINE('--- INFORMACION DEL RECINTO ---');
+	DBMS_OUTPUT.PUT_LINE('Nombre: ' || v_recinto.nombre);
+	DBMS_OUTPUT.PUT_LINE('Direccion: ' || v_recinto.direccion);
+	DBMS_OUTPUT.PUT_LINE('Ciudad: ' || v_recinto.ciudad);
+	DBMS_OUTPUT.PUT_LINE('Capacidad total: ' || v_recinto.capacidad_total);
+EXCEPTION
+	WHEN NO_DATA_FOUND THEN
+		DBMS_OUTPUT.PUT_LINE(
+			'No existe un recinto con el identificador ' || p_recinto_id
+		);
+	WHEN TOO_MANY_ROWS THEN
+		DBMS_OUTPUT.PUT_LINE(
+			'La consulta devolvio mas de un recinto para el identificador '
+			|| p_recinto_id
+		);
+	WHEN OTHERS THEN
+		DBMS_OUTPUT.PUT_LINE('Codigo de error: ' || SQLCODE);
+		DBMS_OUTPUT.PUT_LINE('Mensaje de error: ' || SQLERRM);
+END;
+/
+
+--Ejercicio 3: Bloque con CURSOR Explicito y cierre seguro de Exepciones
+DECLARE
+	CURSOR c_tickets_emitidos IS
+		SELECT c.cliente_id AS codigo_cliente,
+			   c.nombre || ' ' || c.apellido AS nombre_completo,
+			   t.precio_pagado,
+			   tp.metodo_pago
+		FROM   ticket t
+			   JOIN transaccion_pago tp
+				   ON tp.transaccion_id = t.transaccion_id
+			   JOIN reserva_temporal rt
+				   ON rt.reserva_id = t.reserva_id
+			   JOIN cliente c
+				   ON c.cliente_id = rt.cliente_id
+		WHERE  t.estado = 'EMITIDO';
+
+	v_ticket c_tickets_emitidos%ROWTYPE;
+BEGIN
+	OPEN c_tickets_emitidos;
+
+	LOOP
+		FETCH c_tickets_emitidos INTO v_ticket;
+		EXIT WHEN c_tickets_emitidos%NOTFOUND;
+
+		DBMS_OUTPUT.PUT_LINE('--- TICKET EMITIDO ---');
+		DBMS_OUTPUT.PUT_LINE('Codigo cliente: ' || v_ticket.codigo_cliente);
+		DBMS_OUTPUT.PUT_LINE('Cliente: ' || v_ticket.nombre_completo);
+		DBMS_OUTPUT.PUT_LINE('Precio pagado: $' || v_ticket.precio_pagado);
+		DBMS_OUTPUT.PUT_LINE('Metodo de pago: ' || v_ticket.metodo_pago);
+	END LOOP;
+
+	CLOSE c_tickets_emitidos;
+EXCEPTION
+	WHEN CURSOR_ALREADY_OPEN THEN
+		DBMS_OUTPUT.PUT_LINE('Error: el cursor ya se encontraba abierto.');
+		IF c_tickets_emitidos%ISOPEN THEN
+			CLOSE c_tickets_emitidos;
+		END IF;
+	WHEN INVALID_CURSOR THEN
+		DBMS_OUTPUT.PUT_LINE('Error: el cursor no es valido.');
+		IF c_tickets_emitidos%ISOPEN THEN
+			CLOSE c_tickets_emitidos;
+		END IF;
+	WHEN OTHERS THEN
+		DBMS_OUTPUT.PUT_LINE('Codigo de error: ' || SQLCODE);
+		DBMS_OUTPUT.PUT_LINE('Mensaje de error: ' || SQLERRM);
+		IF c_tickets_emitidos%ISOPEN THEN
+			CLOSE c_tickets_emitidos;
+		END IF;
+END;
+/
+
+--Ejercicio 4: Bloque con CURSOR con parámetro y 
+--Excepcion definida por el usuario
+DECLARE
+e_sin_eventos EXCEPTION;
+    Cursor c_eventos_productora(p_productora_id NUMBER) IS
+        SELECT nombre_evento, fecha_evento, estado_evento
+        FROM evento
+        WHERE productora_id = p_productora_id;
+BEGIN
+    FOR v_evento IN c_eventos_productora(1) LOOP
+        DBMS_OUTPUT.PUT_LINE('--- EVENTO ---');
+        DBMS_OUTPUT.PUT_LINE('Nombre: ' || v_evento.nombre_evento);
+        DBMS_OUTPUT.PUT_LINE('Fecha: ' || v_evento.fecha_evento);
+        DBMS_OUTPUT.PUT_LINE('Estado: ' || v_evento.estado_evento);
+    END LOOP;
+    CLOSE c_eventos_productora;
+    IF c_eventos_productora%ROWCOUNT = 0 THEN
+        RAISE e_sin_eventos;
+    END IF;
+EXCEPTION
+    WHEN e_sin_eventos THEN
+        DBMS_OUTPUT.PUT_LINE('No se encontraron eventos para la productora especificada.');
+END;
+

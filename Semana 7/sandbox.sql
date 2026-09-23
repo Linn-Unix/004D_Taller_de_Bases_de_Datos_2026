@@ -1,5 +1,4 @@
-
-
+--Insertar Clientes
 BEGIN
     Insertar_cliente('14.201.255-7', 'Miguel', 'Sanhueza', 'msanhueza@gmail.com', null);
 
